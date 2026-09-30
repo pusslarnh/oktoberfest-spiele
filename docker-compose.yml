@@ -5,7 +5,8 @@ services:
     # image: ghcr.io/pusslarnh/oktoberfest-spiele:latest
     container_name: oktoberfest-spiele
     ports:
-      - "8080:3000"
+      # Porten på servern. Ändra via HOST_PORT under "Environment variables" i Portainer.
+      - "${HOST_PORT:-8090}:3000"
     environment:
       # Sätt en PIN-kod så att bara domarna kan dela ut poäng (tomt = ingen PIN).
       ADMIN_PIN: "${ADMIN_PIN:-}"

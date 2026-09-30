@@ -25,7 +25,7 @@ Alla enheter som har sidan öppen synkas direkt, till exempel domarens mobil och
 
 ```bash
 docker build -t oktoberfest-spiele https://github.com/pusslarnh/oktoberfest-spiele.git#main
-docker run -d --name oktoberfest -p 8080:3000 -v oktoberfest-data:/data oktoberfest-spiele
+docker run -d --name oktoberfest -p 8090:3000 -v oktoberfest-data:/data oktoberfest-spiele
 ```
 
 ### Alternativ 2: färdig image från GitHub Container Registry
@@ -33,7 +33,7 @@ docker run -d --name oktoberfest -p 8080:3000 -v oktoberfest-data:/data oktoberf
 Workflowet i `.github/workflows/docker.yml` bygger och publicerar en image vid varje push till `main`:
 
 ```bash
-docker run -d --name oktoberfest -p 8080:3000 -v oktoberfest-data:/data ghcr.io/pusslarnh/oktoberfest-spiele:latest
+docker run -d --name oktoberfest -p 8090:3000 -v oktoberfest-data:/data ghcr.io/pusslarnh/oktoberfest-spiele:latest
 ```
 
 > Första gången: gå till repot på GitHub, sedan **Packages → oktoberfest-spiele → Package settings**, och gör paketet *Public*. Annars måste du köra `docker login ghcr.io` först.
@@ -46,12 +46,13 @@ cd oktoberfest-spiele
 docker compose up -d
 ```
 
-Öppna sedan **http://localhost:8080**. Från andra enheter i nätverket använder du `http://<datorns-ip>:8080`.
+Öppna sedan **http://localhost:8090**. Från andra enheter i nätverket använder du `http://<datorns-ip>:8090`.
 
 ## Inställningar
 
 | Miljövariabel | Standard | Beskrivning |
 | --- | --- | --- |
+| `HOST_PORT` | `8090` | Porten på servern när du kör med compose eller Portainer. |
 | `ADMIN_PIN` | *(tom)* | Om du sätter en PIN kan bara den som anger den dela ut poäng. Alla kan fortfarande titta. |
 | `PORT` | `3000` | Porten inuti containern. |
 | `DATA_DIR` | `/data` | Här sparas `state.json`. Montera en volym så att poängen överlever en omstart. |
