@@ -5,7 +5,7 @@ ENV NODE_ENV=production \
     DATA_DIR=/data
 
 WORKDIR /app
-COPY package.json server.ts ./
+COPY package.json server.ts facit.ts ./
 COPY public ./public
 
 RUN mkdir -p /data && chown node:node /data

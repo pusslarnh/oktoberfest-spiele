@@ -96,6 +96,8 @@ button, input { font: inherit; color: inherit; }
 }
 .nav a:hover { color: var(--cream); background: var(--card); }
 .nav a.active { color: var(--bg); background: var(--gold); }
+body:not(.admin) .admin-only { display: none; }
+body.admin #adminBtn { border-color: var(--gold); color: var(--gold-hi); }
 .ribbon {
   height: 4px;
   background: repeating-linear-gradient(45deg, var(--blue) 0 6px, var(--cream) 6px 12px);
@@ -456,9 +458,10 @@ input:focus { outline: none; border-color: var(--gold); }
 .modal::backdrop { background: rgba(10, 6, 3, .7); backdrop-filter: blur(6px); }
 .modal h3 { font-size: 22px; color: var(--cream); }
 .modal input { margin: 16px 0; font: 700 20px var(--mono); text-align: center; letter-spacing: .3em; }
+.pin-error { margin: -8px 0 12px; min-height: 1.2em; color: var(--red-hi); font-weight: 600; text-align: center; }
 
 /* --- storskärm (helskärm) --- */
-body.tv .footer, body.tv .nav, body.tv #fullscreenBtn span { display: none; }
+body.tv .footer, body.tv .nav, body.tv #fullscreenBtn span, body.tv #adminBtn { display: none; }
 body.tv .view { max-width: none; }
 body.tv .side .card:last-child { display: none; }
 
@@ -472,7 +475,7 @@ body.tv .side .card:last-child { display: none; }
 @media (max-width: 1100px) {
   .topbar { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
   .live-pill { margin-left: auto; }
-  .nav { order: 3; width: 100%; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .nav { order: 3; width: 100%; margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
   .nav a { text-align: center; padding: 9px 6px; font-size: 13px; }
 }
 @media (max-width: 900px) {
@@ -494,7 +497,8 @@ body.tv .side .card:last-child { display: none; }
 }
 @media (max-width: 560px) {
   .brand span { font-size: 19px; }
-  .nav { grid-template-columns: 1fr 1fr; }
+  .nav { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  #adminBtn span { display: none; }
   .board-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
   .board-delta { display: none; }
   .board-total { font-size: 28px; }

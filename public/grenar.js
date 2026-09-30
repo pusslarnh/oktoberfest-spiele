@@ -74,6 +74,7 @@ export const LEKAR = [
   },
 ];
 
+// Svaren (facit) ligger i facit.ts på servern och hämtas bara av inloggade domare.
 export const QUIZ = {
   id: 'meningar', icon: '📝', sv: 'Vad betyder meningen?', de: 'Frågesport',
   desc: 'Skriv den svenska betydelsen av varje mening. De som är märkta med ★ är talesätt, så översätt vad de betyder, inte ord för ord. Halv poäng för nästan rätt, rättaren bestämmer.',
@@ -81,30 +82,26 @@ export const QUIZ = {
   max: 20,
   bonusPoints: 2,
   sentences: [
-    { de: 'Ein Bier, bitte!', sv: 'En öl, tack!' },
-    { de: 'Wo ist die Toilette?', sv: 'Var ligger toaletten?' },
-    { de: 'Ich habe Hunger wie ein Bär.', sv: 'Jag är hungrig som en björn.', note: 'Varg på svenska går lika bra.' },
-    { de: 'Die Wurst ist zu heiß.', sv: 'Korven är för varm.' },
-    { de: 'Mein Bruder tanzt auf dem Tisch.', sv: 'Min bror dansar på bordet.' },
-    { de: 'Das ist nicht mein Bier.', idiom: true, sv: 'Det angår inte mig, det är inte mitt bord.', note: 'Ordagrant: det är inte min öl.' },
-    { de: 'Ich verstehe nur Bahnhof.', idiom: true, sv: 'Jag fattar ingenting.', note: 'Ordagrant: jag förstår bara järnvägsstation.' },
-    { de: 'Der Hund hat meine Brezel gefressen.', sv: 'Hunden har ätit upp min kringla.' },
-    { de: 'Prost, meine Freunde!', sv: 'Skål, mina vänner!' },
-    { de: 'Ich kann nicht mehr trinken.', sv: 'Jag orkar inte dricka mer.' },
-    { de: 'Du hast Tomaten auf den Augen.', idiom: true, sv: 'Du ser inte vad som händer framför näsan på dig.', note: 'Ordagrant: du har tomater på ögonen.' },
-    { de: 'Morgen habe ich Kopfschmerzen.', sv: 'I morgon har jag huvudvärk.' },
-    { de: 'Der Kellner bringt zehn Maß Bier.', sv: 'Kyparen kommer med tio sejdlar öl.', note: 'Ein Maß rymmer exakt en liter.' },
-    { de: 'Wie viel kostet das Bier?', sv: 'Hur mycket kostar ölen?' },
-    { de: 'Meine Lederhose ist zu eng.', sv: 'Mina skinnbyxor är för trånga.' },
-    { de: 'Das Leben ist kein Ponyhof.', idiom: true, sv: 'Livet är ingen dans på rosor.', note: 'Ordagrant: livet är ingen ponnygård.' },
-    { de: 'Die Blaskapelle spielt zu laut.', sv: 'Blåsorkestern spelar för högt.' },
-    { de: 'Jetzt geht’s los!', sv: 'Nu kör vi, nu drar det igång!' },
+    { de: 'Ein Bier, bitte!' },
+    { de: 'Wo ist die Toilette?' },
+    { de: 'Ich habe Hunger wie ein Bär.' },
+    { de: 'Die Wurst ist zu heiß.' },
+    { de: 'Mein Bruder tanzt auf dem Tisch.' },
+    { de: 'Das ist nicht mein Bier.', idiom: true },
+    { de: 'Ich verstehe nur Bahnhof.', idiom: true },
+    { de: 'Der Hund hat meine Brezel gefressen.' },
+    { de: 'Prost, meine Freunde!' },
+    { de: 'Ich kann nicht mehr trinken.' },
+    { de: 'Du hast Tomaten auf den Augen.', idiom: true },
+    { de: 'Morgen habe ich Kopfschmerzen.' },
+    { de: 'Der Kellner bringt zehn Maß Bier.' },
+    { de: 'Wie viel kostet das Bier?' },
+    { de: 'Meine Lederhose ist zu eng.' },
+    { de: 'Das Leben ist kein Ponyhof.', idiom: true },
+    { de: 'Die Blaskapelle spielt zu laut.' },
+    { de: 'Jetzt geht’s los!' },
   ],
-  bonus: {
-    de: 'Ein Prosit der Gemütlichkeit!',
-    sv: 'En skål för gemytligheten.',
-    note: 'Skålsången som spelas i varje öltält i München, ungefär var tjugonde minut hela kvällen.',
-  },
+  bonus: { de: 'Ein Prosit der Gemütlichkeit!' },
 };
 
 export const MUSIC = {
@@ -112,26 +109,8 @@ export const MUSIC = {
   desc: 'Varje låt spelas i trettio sekunder. Skriv artist och låttitel, ett poäng för vardera. Alla tolv har en tysk koppling, även de som sjungs på engelska. Byt blankett med ett annat lag vid rättningen. Stavfel ger poäng ändå.',
   kit: 'Blatt 4, högtalare och facit (blatt 5)',
   max: 25,
-  songs: [
-    { artist: 'Nena', title: '99 Luftballons', year: 1983, fact: 'Sjungs på tyska. Handlar om nittionio ballonger som misstas för ett kärnvapenanfall.' },
-    { artist: 'Modern Talking', title: 'You’re My Heart, You’re My Soul', year: 1984, fact: 'Duo från Berlin. Falsettstämman är producenten Dieter Bohlen, inte frontfiguren.' },
-    { artist: 'Rammstein', title: 'Du hast', year: 1997, fact: 'Ordvitsen är att du hast och du hasst låter likadant, du har och du hatar.' },
-    { artist: 'Falco', title: 'Rock Me Amadeus', year: 1985, fact: 'Österrikare från Wien, och den enda tyskspråkiga etta som USA-listan haft.' },
-    { artist: 'Kraftwerk', title: 'Das Model', year: 1978, fact: 'Från Düsseldorf. Utan dem finns varken house, techno eller elektropop.' },
-    { artist: 'Trio', title: 'Da Da Da', year: 1982, fact: 'Nya tyska vågen i sin renaste form, byggd på ett billigt Casiotangentbord.' },
-    { artist: 'Scorpions', title: 'Wind of Change', year: 1990, fact: 'Skriven efter en resa till Moskva och blev ljudspåret till Berlinmurens fall.' },
-    { artist: 'Snap!', title: 'Rhythm Is a Dancer', year: 1992, fact: 'Eurodance från Frankfurt. Två tyska producenter som hyrde in sina sångare.' },
-    { artist: 'Alphaville', title: 'Forever Young', year: 1984, fact: 'Tyskt band från Münster, trots det engelska namnet och den engelska texten.' },
-    { artist: 'Lou Bega', title: 'Mambo No. 5', year: 1999, fact: 'Född i München. Melodin är lånad från en kubansk instrumentallåt från 1949.' },
-    { artist: 'DJ Ötzi', title: 'Anton aus Tirol', year: 1999, fact: 'Sjungs på tyska. Spelas i öltälten varje kväll, alla kan refrängen efter en gång.' },
-    { artist: 'Helene Fischer', title: 'Atemlos durch die Nacht', year: 2013, fact: 'Sjungs på tyska. Nutidens största schlager, den självklara avslutningen.' },
-  ],
-  tiebreak: {
-    q: 'Hur många av de tolv låtarna sjungs på tyska?',
-    answer: 4,
-    accept: [4, 5],
-    note: 'Fyra: nummer 1, 3, 11 och 12. Godkänn fem om laget räknar in Falco, som blandar tyska och engelska. Närmast utan att gå över vinner vid lika poäng.',
-  },
+  songCount: 12,
+  tiebreak: { q: 'Hur många av de tolv låtarna sjungs på tyska?' },
 };
 
 export const ALL_GRENAR = [...LEKAR, QUIZ, MUSIC];

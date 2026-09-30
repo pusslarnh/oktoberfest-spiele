@@ -20,10 +20,11 @@
     <span class="live-pill" id="livePill"><i></i><span>O’zapft is!</span></span>
     <nav class="nav" id="nav">
       <a href="#topplista" data-route="topplista">Topplista</a>
-      <a href="#poang" data-route="poang">Poängutdelning</a>
+      <a href="#poang" data-route="poang" class="admin-only">Poängutdelning</a>
       <a href="#lag" data-route="lag">Deltagare &amp; Lag</a>
       <a href="#grenar" data-route="grenar">Grenar &amp; Regler</a>
     </nav>
+    <button class="btn ghost" id="adminBtn" type="button" title="Logga in som domare">🔒 <span>Domare</span></button>
     <button class="btn ghost" id="fullscreenBtn" type="button" title="Storskärmsläge">⛶ <span>Storskärm</span></button>
   </header>
   <div class="ribbon" aria-hidden="true"></div>
@@ -40,11 +41,12 @@
   <dialog id="pinDialog" class="modal">
     <form method="dialog" id="pinForm">
       <h3>Domarens PIN-kod</h3>
-      <p>Poängsättningen är låst. Ange PIN-koden från festkommittén.</p>
+      <p>Logga in för att dela ut poäng, hantera lag och se facit.</p>
       <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" required>
+      <p class="pin-error" id="pinError" role="alert"></p>
       <div class="row end">
-        <button class="btn ghost" value="cancel" formnovalidate>Avbryt</button>
-        <button class="btn gold" value="ok">Lås upp</button>
+        <button class="btn ghost" type="button" onclick="this.closest('dialog').close('cancel')">Avbryt</button>
+        <button class="btn gold" value="ok">Logga in</button>
       </div>
     </form>
   </dialog>

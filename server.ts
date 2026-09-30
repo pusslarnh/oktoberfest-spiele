@@ -6,6 +6,7 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join, extname, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GREN_IDS, LEK_IDS, LEKAR, QUIZ, MUSIC } from './public/grenar.js';
+import { FACIT } from './facit.ts';
 
 type Result = '' | 'win' | 'part';
 type TeamStatus = 'active' | 'paused';
@@ -20,7 +21,8 @@ interface Team {
 }
 interface GameEntry { r: Result; pen: number }
 interface QuizEntry { q: number[]; bonus: number }
-interface MusicEntry { a: boolean[]; t: boolean[]; guess: number | null }
+// ok och dist räknas ut av servern så att svaret på utslagsfrågan inte behöver skickas till alla.
+interface MusicEntry { a: boolean[]; t: boolean[]; guess: number | null; ok?: boolean; dist?: number | null }
 interface LogEntry { id: string; ts: number; text: string; pts: number | null }
 
 interface State {
@@ -50,7 +52,11 @@ const ADMIN_PIN = process.env.ADMIN_PIN ?? '';
 const PUBLIC_DIR = resolve(import.meta.dirname, 'public');
 const STATE_FILE = join(DATA_DIR, 'state.json');
 const QUIZ_LEN = QUIZ.sentences.length;
-const SONG_LEN = MUSIC.songs.length;
+const SONG_LEN = MUSIC.songCount;
+
+if (FACIT.quiz.length !== QUIZ_LEN || FACIT.songs.length !== SONG_LEN) {
+  throw new Error('facit.ts matchar inte antalet frågor och låtar i public/grenar.js');
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -75,6 +81,7 @@ async function load(): Promise<void> {
   try {
     const raw = JSON.parse(await readFile(STATE_FILE, 'utf8')) as Partial<State>;
     state = { ...emptyState(), ...raw };
+    for (const entry of Object.values(state.music)) scoreGuess(entry);
     console.log(`Laddade ${state.teams.length} lag från ${STATE_FILE}`);
   } catch {
     console.log('Ingen sparad poängställning, startar tomt.');
@@ -123,6 +130,14 @@ function quizEntry(teamId: string): QuizEntry {
 function musicEntry(teamId: string): MusicEntry {
   state.music[teamId] ??= { a: Array<boolean>(SONG_LEN).fill(false), t: Array<boolean>(SONG_LEN).fill(false), guess: null };
   return state.music[teamId];
+}
+
+// Utslagsfrågan: rätt svar ger 1p, annars avgör avståndet under svaret vid lika poäng.
+function scoreGuess(entry: MusicEntry): void {
+  const { answer, accept } = FACIT.tiebreak;
+  const g = entry.guess;
+  entry.ok = g != null && accept.includes(g);
+  entry.dist = g == null ? null : entry.ok ? 0 : g > answer ? null : answer - g;
 }
 
 function log(text: string, pts: number | null = null): void {
@@ -210,7 +225,9 @@ function apply(op: Op): void {
     }
     case 'setGuess': {
       const team = teamOf(op.team);
-      musicEntry(team.id).guess = op.guess === null || op.guess === '' ? null : intIn(op.guess, 0, SONG_LEN, 'gissning');
+      const entry = musicEntry(team.id);
+      entry.guess = op.guess === null || op.guess === '' ? null : intIn(op.guess, 0, SONG_LEN, 'gissning');
+      scoreGuess(entry);
       break;
     }
     case 'logResult': {
@@ -244,6 +261,25 @@ function apply(op: Op): void {
     default:
       throw new HttpError(400, 'Okänd operation');
   }
+}
+
+// --- pin -----------------------------------------------------------------
+
+// Enkel spärr mot att gissa PIN: efter 5 fel från samma adress låses den i 30 sekunder.
+const failures = new Map<string, { count: number; until: number }>();
+
+function checkPin(req: IncomingMessage, pin: unknown): void {
+  if (!ADMIN_PIN) return;
+  const ip = req.socket.remoteAddress ?? '';
+  const f = failures.get(ip);
+  if (f && f.until > Date.now()) throw new HttpError(429, 'För många fel, vänta en stund');
+  if (pin === ADMIN_PIN) {
+    failures.delete(ip);
+    return;
+  }
+  const count = (f?.count ?? 0) + 1;
+  failures.set(ip, { count: count >= 5 ? 0 : count, until: count >= 5 ? Date.now() + 30_000 : 0 });
+  throw new HttpError(401, 'Fel PIN-kod');
 }
 
 // --- http ----------------------------------------------------------------
@@ -295,8 +331,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
+  if (pathname === '/api/login' && req.method === 'POST') {
+    checkPin(req, req.headers['x-admin-pin']);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/facit' && req.method === 'GET') {
+    checkPin(req, req.headers['x-admin-pin']);
+    return sendJson(res, 200, FACIT);
+  }
+
   if (pathname === '/api/op' && req.method === 'POST') {
-    if (ADMIN_PIN && req.headers['x-admin-pin'] !== ADMIN_PIN) throw new HttpError(401, 'Fel PIN-kod');
+    checkPin(req, req.headers['x-admin-pin']);
     let op: Op;
     try {
       op = JSON.parse(await readBody(req)) as Op;

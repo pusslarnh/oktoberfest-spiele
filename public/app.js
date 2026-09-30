@@ -15,6 +15,9 @@ const ui = {
 let rankDelta = new Map();
 let prevRanks = null;
 let pin = store('okt-pin') ?? '';
+let admin = false;
+let pinRequired = true;
+let facit = null;
 
 const $view = document.getElementById('view');
 const $toast = document.getElementById('toast');
@@ -22,7 +25,8 @@ const $toast = document.getElementById('toast');
 function store(key, value) {
   try {
     if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
   } catch { /* privat läge */ }
   return null;
 }
@@ -48,8 +52,9 @@ function quizPoints(entry) {
   return entry.q.reduce((a, b) => a + b, 0) + entry.bonus;
 }
 
+// Servern räknar ut ok och dist, så svaret på utslagsfrågan aldrig skickas till gästerna.
 function tiebreakOk(entry) {
-  return entry != null && entry.guess != null && MUSIC.tiebreak.accept.includes(entry.guess);
+  return entry?.ok === true;
 }
 
 function musicPoints(entry) {
@@ -60,10 +65,7 @@ function musicPoints(entry) {
 
 // Utslagsfrågan: närmast utan att gå över vinner vid lika poäng.
 function tieDistance(entry) {
-  if (!entry || entry.guess == null) return Infinity;
-  if (tiebreakOk(entry)) return 0;
-  if (entry.guess > MUSIC.tiebreak.answer) return Infinity;
-  return MUSIC.tiebreak.answer - entry.guess;
+  return entry?.dist ?? Infinity;
 }
 
 function scoreboard() {
@@ -120,7 +122,8 @@ async function op(type, payload = {}) {
     body: JSON.stringify({ type, ...payload }),
   });
   if (res.status === 401) {
-    if (await askPin()) return op(type, payload);
+    logout();
+    toast('Logga in som domare för att ändra poäng', true);
     return false;
   }
   if (!res.ok) {
@@ -131,21 +134,56 @@ async function op(type, payload = {}) {
   return true;
 }
 
-function askPin() {
-  const dialog = document.getElementById('pinDialog');
-  const input = document.getElementById('pinInput');
-  input.value = '';
-  dialog.showModal();
-  return new Promise((done) => {
-    dialog.addEventListener('close', () => {
-      if (dialog.returnValue === 'ok' && input.value) {
-        pin = input.value;
-        store('okt-pin', pin);
-        done(true);
-      } else done(false);
-    }, { once: true });
-  });
+// Returnerar null vid lyckad inloggning, annars ett felmeddelande.
+async function login(value) {
+  const headers = { 'X-Admin-Pin': value };
+  const res = await fetch('api/login', { method: 'POST', headers }).catch(() => null);
+  if (!res?.ok) {
+    const body = await res?.json().catch(() => ({}));
+    return body?.error ?? 'Kunde inte nå servern';
+  }
+  const f = await fetch('api/facit', { headers });
+  facit = f.ok ? await f.json() : null;
+  pin = value;
+  store('okt-pin', pin);
+  admin = true;
+  render();
+  return null;
 }
+
+function logout() {
+  admin = false;
+  facit = null;
+  pin = '';
+  store('okt-pin', null);
+  ui.showFacit = false;
+  if (location.hash === '#poang') location.hash = 'topplista';
+  render();
+}
+
+const $pinDialog = document.getElementById('pinDialog');
+const $pinInput = document.getElementById('pinInput');
+const $pinError = document.getElementById('pinError');
+
+function askPin() {
+  $pinInput.value = '';
+  $pinError.textContent = '';
+  $pinDialog.showModal();
+}
+
+// Dialogen står kvar vid fel PIN så att man kan försöka igen direkt.
+document.getElementById('pinForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!$pinInput.value) return;
+  const error = await login($pinInput.value);
+  $pinError.textContent = error ?? '';
+  if (error) {
+    $pinInput.select();
+    return;
+  }
+  $pinDialog.close();
+  toast('Inloggad som domare');
+});
 
 function connect() {
   const pill = document.getElementById('livePill');
@@ -172,11 +210,16 @@ function toast(text, bad = false) {
 
 function route() {
   const r = location.hash.slice(1);
+  if (r === 'poang' && !admin) return 'topplista';
   return ['topplista', 'poang', 'lag', 'grenar'].includes(r) ? r : 'topplista';
 }
 
 function render() {
   const r = route();
+  document.body.classList.toggle('admin', admin);
+  const btn = document.getElementById('adminBtn');
+  btn.innerHTML = admin ? '🔓 <span>Logga ut</span>' : '🔒 <span>Domare</span>';
+  btn.title = admin ? 'Logga ut från domarläget' : 'Logga in som domare';
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === r));
   if (!S) {
     $view.innerHTML = '<p class="muted center pad">Laddar poängställningen…</p>';
@@ -223,8 +266,9 @@ function emptyTeams() {
   return `<div class="empty card">
     <div class="empty-icon">🍺</div>
     <h2>Inga lag ännu</h2>
-    <p class="muted">Lägg till lagen innan första grenen börjar, så fylls tavlan på allt eftersom.</p>
-    <a class="btn gold" href="#lag">＋ Lägg till lag</a>
+    ${admin
+      ? '<p class="muted">Lägg till lagen innan första grenen börjar, så fylls tavlan på allt eftersom.</p><a class="btn gold" href="#lag">＋ Lägg till lag</a>'
+      : '<p class="muted">Domarna lägger till lagen innan första grenen börjar.</p>'}
   </div>`;
 }
 
@@ -476,13 +520,13 @@ function quizScoring(rows) {
   const team = S.teams.find((t) => t.id === selected);
   const e = S.quiz[selected] ?? { q: Array(QUIZ.sentences.length).fill(0), bonus: 0 };
   const total = quizPoints(e);
-  const facit = ui.showFacit;
+  const show = ui.showFacit && facit;
 
   const lines = QUIZ.sentences.map((s, i) => `<div class="q-row">
       <span class="q-nr">${i + 1}</span>
       <div class="q-text">
         <b>${esc(s.de)}${s.idiom ? ' <span class="star" title="Talesätt">★</span>' : ''}</b>
-        ${facit ? `<span class="facit">${esc(s.sv)}${s.note ? ` <em>${esc(s.note)}</em>` : ''}</span>` : ''}
+        ${show ? `<span class="facit">${esc(facit.quiz[i].sv)}${facit.quiz[i].note ? ` <em>${esc(facit.quiz[i].note)}</em>` : ''}</span>` : ''}
       </div>
       <div class="seg sm">
         ${[0, 0.5, 1].map((v) => `<button class="${e.q[i] === v ? (v === 0 ? 'on' : 'on gold') : ''}" data-act="quiz" data-team="${selected}" data-idx="${i}" data-v="${v}" type="button">${v === 0.5 ? '½' : v}</button>`).join('')}
@@ -494,7 +538,7 @@ function quizScoring(rows) {
       <div class="q-text">
         <span class="tag amber">Bonus · ${QUIZ.bonusPoints} poäng</span>
         <b>${esc(QUIZ.bonus.de)}</b>
-        ${facit ? `<span class="facit">${esc(QUIZ.bonus.sv)} <em>${esc(QUIZ.bonus.note)}</em></span>` : ''}
+        ${show ? `<span class="facit">${esc(facit.bonus.sv)} <em>${esc(facit.bonus.note)}</em></span>` : ''}
       </div>
       <div class="seg sm">
         ${[0, 1, 2].map((v) => `<button class="${e.bonus === v ? (v === 0 ? 'on' : 'on gold') : ''}" data-act="quiz" data-team="${selected}" data-idx="${QUIZ.sentences.length}" data-v="${v}" type="button">${v}</button>`).join('')}
@@ -522,15 +566,15 @@ function quizScoring(rows) {
 function musicScoring(rows) {
   const { selected, html } = teamPicker('musicTeam', rows, (r) => r.music);
   const team = S.teams.find((t) => t.id === selected);
-  const n = MUSIC.songs.length;
+  const n = MUSIC.songCount;
   const e = S.music[selected] ?? { a: Array(n).fill(false), t: Array(n).fill(false), guess: null };
   const total = musicPoints(e);
-  const facit = ui.showFacit;
+  const show = ui.showFacit && facit;
 
-  const lines = MUSIC.songs.map((s, i) => `<div class="q-row">
+  const lines = Array.from({ length: n }, (_, i) => facit?.songs[i]).map((s, i) => `<div class="q-row">
       <span class="q-nr">${i + 1}</span>
       <div class="q-text">
-        ${facit ? `<b>${esc(s.artist)} – <i>${esc(s.title)}</i> <span class="muted">${s.year}</span></b><span class="facit">${esc(s.fact)}</span>` : `<b>Låt ${i + 1}</b><span class="muted small">Facit dolt</span>`}
+        ${show ? `<b>${esc(s.artist)} – <i>${esc(s.title)}</i> <span class="muted">${s.year}</span></b><span class="facit">${esc(s.fact)}</span>` : `<b>Låt ${i + 1}</b><span class="muted small">Facit dolt</span>`}
       </div>
       <div class="seg sm">
         <button class="${e.a[i] ? 'on gold' : ''}" data-act="music" data-team="${selected}" data-song="${i}" data-field="a" data-v="${!e.a[i]}" type="button">Artist ${e.a[i] ? '✓' : ''}</button>
@@ -545,7 +589,7 @@ function musicScoring(rows) {
       <div class="q-text">
         <span class="tag amber">Utslagsfråga · 1 poäng</span>
         <b>${esc(tb.q)}</b>
-        ${facit ? `<span class="facit">${esc(tb.note)}</span>` : '<span class="muted small">Närmast utan att gå över vinner vid lika poäng.</span>'}
+        ${show ? `<span class="facit">${esc(facit.tiebreak.note)}</span>` : '<span class="muted small">Närmast utan att gå över vinner vid lika poäng.</span>'}
       </div>
       <div class="guess">
         <input id="guess-${selected}" type="number" min="0" max="${n}" inputmode="numeric" placeholder="Svar" value="${e.guess ?? ''}" data-act="guess" data-team="${selected}" aria-label="Lagets svar på utslagsfrågan">
@@ -628,7 +672,7 @@ function viewLag() {
   const done = ALL_GRENAR.filter((g) => grenDone(g.id)).length;
   const cards = rows.map((row) => {
     const t = row.team;
-    if (ui.editTeam === t.id) return teamForm(t);
+    if (admin && ui.editTeam === t.id) return teamForm(t);
     const label = row.rank === 1 ? 'Guld' : row.rank === 2 ? 'Silver' : row.rank === 3 ? 'Brons' : '';
     return `<article class="team-card ${t.status === 'paused' ? 'paused' : ''}">
       <span class="rank-flag ${rankClass(row.rank)}">Rank #${row.rank}${label ? ` (${label})` : ''}${t.status === 'paused' ? ' · pausad' : ''}</span>
@@ -642,11 +686,11 @@ function viewLag() {
       <div class="well"><label>🙋 Kämpar</label><div>${esc(t.members) || '<span class="muted">Inga namn angivna</span>'}</div></div>
       ${t.motto ? `<div class="motto">“${esc(t.motto)}”</div>` : ''}
       <div class="split">${splitLine(row)}</div>
-      <div class="team-actions">
+      ${admin ? `<div class="team-actions">
         <button class="btn ghost sm" data-act="editTeam" data-id="${t.id}" type="button">✎ Redigera</button>
         <button class="btn ghost sm" data-act="toggleStatus" data-id="${t.id}" type="button">${t.status === 'active' ? '⏸ Pausa' : '▶ Aktivera'}</button>
         ${confirmBtn(`del-${t.id}`, '🗑 Ta bort', 'deleteTeam', `data-id="${t.id}"`)}
-      </div>
+      </div>` : ''}
     </article>`;
   }).join('');
 
@@ -663,20 +707,20 @@ function viewLag() {
         <div><label>Grenar klara</label><b>${done} / ${ALL_GRENAR.length}</b></div>
       </div>
     </div>
-    <div class="toolbar card">
+    ${admin ? `<div class="toolbar card">
       <button class="btn gold" data-act="toggleAdd" type="button">＋ Lägg till lag</button>
       <span class="muted small">Tips: skriv kämparna separerade med komma eller &amp;.</span>
-    </div>
-    ${ui.addOpen ? teamForm(null) : ''}
-    ${rows.length ? `<div class="team-grid">${cards}</div>` : (ui.addOpen ? '' : emptyTeams())}
-    <div class="card danger-zone">
+    </div>` : ''}
+    ${admin && ui.addOpen ? teamForm(null) : ''}
+    ${rows.length ? `<div class="team-grid">${cards}</div>` : (admin && ui.addOpen ? '' : emptyTeams())}
+    ${admin ? `<div class="card danger-zone">
       <div class="card-head"><span class="kicker red">Festkommitténs verktyg</span></div>
       <div class="row wrap">
         <a class="btn ghost sm" href="api/state" download="oktoberfest-poang.json">⬇ Ladda ner säkerhetskopia</a>
         ${confirmBtn('reset-scores', 'Nollställ alla poäng (behåll lag)', 'reset', 'data-keep="true"')}
         ${confirmBtn('reset-all', 'Radera allt', 'reset', 'data-keep="false"')}
       </div>
-    </div>`;
+    </div>` : ''}`;
 }
 
 // Grenar & regler ----------------------------------------------------------
@@ -685,9 +729,11 @@ function viewGrenar() {
   const done = ALL_GRENAR.filter((g) => grenDone(g.id)).length;
   const timeline = ALL_GRENAR.map((g, i) => {
     const cls = g.id === S.current ? 'live' : grenDone(g.id) ? 'done' : '';
-    return `<button class="step ${cls}" data-act="goScore" data-id="${g.id}" type="button" title="${esc(g.sv)}">
+    const tag = admin ? 'button' : 'div';
+    const attrs = admin ? `data-act="goScore" data-id="${g.id}" type="button"` : '';
+    return `<${tag} class="step ${cls}" ${attrs} title="${esc(g.sv)}">
       <span class="bar"></span><b>G${i + 1}</b><span>${g.icon}</span>
-    </button>`;
+    </${tag}>`;
   }).join('');
 
   const cards = ALL_GRENAR.map((g, i) => {
@@ -709,10 +755,10 @@ function viewGrenar() {
       ${scoringChips(g)}
       <div class="gren-foot">
         <span class="muted small"><b>Behövs:</b> ${esc(g.kit)}</span>
-        <div class="row">
+        ${admin ? `<div class="row">
           ${g.id !== S.current ? `<button class="btn ghost sm" data-act="setCurrent" data-id="${g.id}" type="button">📺 Starta</button>` : ''}
           <button class="btn gold sm" data-act="goScore" data-id="${g.id}" type="button">Poängsätt →</button>
-        </div>
+        </div>` : ''}
       </div>
     </article>`;
   }).join('');
@@ -763,7 +809,7 @@ const actions = {
   music: (d) => op('setMusic', { team: d.team, song: Number(d.song), field: d.field, value: d.v === 'true' }),
   musicAll: async (d) => {
     const v = d.v === 'true';
-    for (let i = 0; i < MUSIC.songs.length; i++) {
+    for (let i = 0; i < MUSIC.songCount; i++) {
       if (!(await op('setMusic', { team: d.team, song: i, field: 'a', value: v }))) return;
       await op('setMusic', { team: d.team, song: i, field: 't', value: v });
     }
@@ -824,6 +870,12 @@ document.addEventListener('submit', async (ev) => {
   render();
 });
 
+document.getElementById('adminBtn').addEventListener('click', () => {
+  if (admin) logout();
+  else if (pinRequired) askPin();
+  else login('').then((error) => toast(error ?? 'Inloggad som domare', !!error));
+});
+
 document.getElementById('fullscreenBtn').addEventListener('click', () => {
   location.hash = 'topplista';
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
@@ -834,5 +886,13 @@ document.addEventListener('fullscreenchange', () => document.body.classList.togg
 window.addEventListener('hashchange', () => { ui.confirm = null; render(); window.scrollTo(0, 0); });
 setInterval(() => { if (route() === 'topplista') render(); }, 30_000);
 
+// Kom ihåg inloggningen mellan besök, men kontrollera att PIN-koden fortfarande stämmer.
+async function init() {
+  const cfg = await fetch('api/config').then((r) => r.json()).catch(() => ({}));
+  pinRequired = cfg.pinRequired !== false;
+  if (store('okt-pin') !== null && (await login(pin))) store('okt-pin', null);
+}
+
 render();
 connect();
+init();
