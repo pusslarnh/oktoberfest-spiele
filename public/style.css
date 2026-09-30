@@ -396,7 +396,24 @@ input:focus { outline: none; border-color: var(--gold); }
 .rank-flag.r1 { background: var(--gold); color: var(--bg); border-color: var(--gold); }
 .rank-flag.r2 { background: var(--silver); color: var(--bg); border-color: var(--silver); }
 .rank-flag.r3 { background: var(--bronze); color: #fff; border-color: var(--bronze); }
-.team-top { display: flex; justify-content: space-between; gap: 12px; }
+.team-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+/* --- lagbilder --- */
+.avatar {
+  flex: none; display: inline-grid; place-items: center; overflow: hidden;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--card-2); border: 2px solid var(--line); color: var(--gold);
+  font: 700 15px/1 var(--display);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.sm { width: 36px; height: 36px; font-size: 13px; }
+.avatar.lg { width: 64px; height: 64px; font-size: 22px; }
+.avatar.xl { width: 104px; height: 104px; margin: 4px auto 8px; border-color: var(--gold); }
+.podium.r1 .avatar.xl { width: 128px; height: 128px; }
+.board-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.board-name > div { min-width: 0; }
+.photo-field { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.team-form .photo-field label.btn { font: 700 12.5px/1.1 var(--mono); letter-spacing: .03em; text-transform: none; color: var(--cream); }
 .team-card .team-name { font-size: 25px; }
 .status { font: 700 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
 .status.paused { color: var(--dim); }

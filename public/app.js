@@ -11,6 +11,8 @@ const ui = {
   editTeam: null,
   addOpen: false,
   confirm: null,
+  // Vald men ännu inte sparad bild per formulär ('new' eller lagets id): { blob, url } eller { remove: true }.
+  photo: {},
 };
 let rankDelta = new Map();
 let prevRanks = null;
@@ -133,6 +135,64 @@ async function op(type, payload = {}) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     toast(body.error ?? 'Något gick fel', true);
+    return false;
+  }
+  return res.json().catch(() => ({ ok: true }));
+}
+
+// --- lagbilder -------------------------------------------------------------
+
+const photoUrl = (team) => `photos/${team.id}.jpg?v=${team.photo}`;
+
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+}
+
+function avatar(team, size = '') {
+  const img = team.photo ? `<img src="${photoUrl(team)}" alt="" loading="lazy">` : esc(initials(team.name));
+  return `<span class="avatar ${size}">${img}</span>`;
+}
+
+// Skalar ner bilden i webbläsaren så att uppladdningen blir liten och snabb.
+// En <img> följer bildens EXIF-rotation, så mobilfoton hamnar rätt.
+async function shrinkPhoto(file, max = 640) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((done, fail) => {
+      img.onload = done;
+      img.onerror = fail;
+      img.src = url;
+    });
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('toBlob'))), 'image/jpeg', 0.85));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function clearPhotoDraft(key) {
+  const draft = ui.photo[key];
+  if (draft?.url) URL.revokeObjectURL(draft.url);
+  delete ui.photo[key];
+}
+
+async function savePhoto(teamId, key) {
+  const draft = ui.photo[key];
+  if (!draft) return true;
+  const res = await fetch(`api/teams/${teamId}/photo`, {
+    method: draft.remove ? 'DELETE' : 'POST',
+    headers: { 'X-Admin-Pin': pin, 'Content-Type': 'image/jpeg' },
+    body: draft.remove ? undefined : draft.blob,
+  }).catch(() => null);
+  clearPhotoDraft(key);
+  if (!res?.ok) {
+    const body = await res?.json().catch(() => ({}));
+    toast(body?.error ?? 'Kunde inte spara bilden', true);
     return false;
   }
   return true;
@@ -304,6 +364,7 @@ function viewTopplista() {
         ${deltaBadge(row.team.id)}
       </div>
       ${row.rank === 1 ? '<div class="crown">Tältledare</div>' : ''}
+      ${row.team.photo ? avatar(row.team, 'xl') : ''}
       <h3 class="team-name">${esc(row.team.name)}</h3>
       ${row.team.members ? `<div class="members">${esc(row.team.members)}</div>` : ''}
       ${row.team.motto ? `<div class="motto">“${esc(row.team.motto)}”</div>` : ''}
@@ -324,8 +385,8 @@ function viewTopplista() {
   const restHtml = rest.map((row) => `<div class="board-row">
       <span class="rank-chip rn">#${row.rank}</span>
       <div class="board-name">
-        <b>${esc(row.team.name)}</b>
-        <span>${esc(row.team.members)}</span>
+        ${avatar(row.team)}
+        <div><b>${esc(row.team.name)}</b><span>${esc(row.team.members)}</span></div>
       </div>
       <div class="board-split">${splitLine(row)}</div>
       <div class="board-delta">${deltaBadge(row.team.id)}</div>
@@ -489,6 +550,7 @@ function lekScoring(g, rows) {
           <h3>${esc(team.name)}</h3>
           <span class="members">${esc(team.members) || '&nbsp;'}</span>
         </div>
+        ${team.photo ? avatar(team, 'sm') : ''}
         <span class="rank-chip ${rankClass(row.rank)}">#${row.rank}</span>
       </header>
       <div class="now">
@@ -660,6 +722,19 @@ function countMembers() {
   return S.teams.reduce((n, t) => n + t.members.split(/,|&|\boch\b|\+/i).map((s) => s.trim()).filter(Boolean).length, 0);
 }
 
+function photoField(team, key) {
+  const draft = ui.photo[key];
+  const src = draft?.remove ? null : draft?.url ?? (team?.photo ? photoUrl(team) : null);
+  return `<div class="photo-field">
+    <span class="avatar lg">${src ? `<img src="${src}" alt="">` : '📷'}</span>
+    <div class="row wrap">
+      <label class="btn ghost sm">📷 Ta foto<input type="file" accept="image/*" capture="environment" data-photo="${key}" hidden></label>
+      <label class="btn ghost sm">🖼 Välj bild<input type="file" accept="image/*" data-photo="${key}" hidden></label>
+      ${src ? `<button class="btn ghost sm" data-act="removePhoto" data-key="${key}" type="button">Ta bort bild</button>` : ''}
+    </div>
+  </div>`;
+}
+
 function teamForm(team) {
   const id = team ? team.id : 'new';
   return `<form class="card team-form" data-form="${team ? 'editTeam' : 'addTeam'}" data-id="${team?.id ?? ''}">
@@ -667,6 +742,7 @@ function teamForm(team) {
     <label>Lagnamn<input id="tf-name-${id}" name="name" maxlength="60" required value="${esc(team?.name)}" placeholder="t.ex. Lederhosen Legends"></label>
     <label>Kämpar<input id="tf-members-${id}" name="members" maxlength="200" value="${esc(team?.members)}" placeholder="Erik, Sara & Johan"></label>
     <label>Motto<input id="tf-motto-${id}" name="motto" maxlength="200" value="${esc(team?.motto)}" placeholder="Vi dricker inte för att vinna…"></label>
+    ${photoField(team, id)}
     <div class="row end">
       <button class="btn ghost" data-act="${team ? 'cancelEdit' : 'toggleAdd'}" type="button">Avbryt</button>
       <button class="btn gold" type="submit">${team ? 'Spara' : '＋ Lägg till'}</button>
@@ -689,7 +765,8 @@ function viewLag() {
     return `<article class="team-card ${t.status === 'paused' ? 'paused' : ''}">
       <span class="rank-flag ${rankClass(row.rank)}">Rank #${row.rank}${label ? ` (${label})` : ''}${t.status === 'paused' ? ' · pausad' : ''}</span>
       <div class="team-top">
-        <div>
+        ${avatar(t, 'lg')}
+        <div class="grow">
           <h3 class="team-name">${esc(t.name)}</h3>
           <span class="status ${t.status}">● ${t.status === 'active' ? 'Aktiv' : 'Pausad'}</span>
         </div>
@@ -834,9 +911,10 @@ const actions = {
   },
   logResult: (d) => op('logResult', { game: d.game, team: d.team, pts: Number(d.pts) }).then((ok) => ok && toast('Resultatet loggat')),
   clearAnnounce: () => op('announce', { text: '' }),
-  toggleAdd: () => { ui.addOpen = !ui.addOpen; render(); document.getElementById('tf-name-new')?.focus(); },
+  toggleAdd: () => { ui.addOpen = !ui.addOpen; clearPhotoDraft('new'); render(); document.getElementById('tf-name-new')?.focus(); },
   editTeam: (d) => { ui.editTeam = d.id; render(); },
-  cancelEdit: () => { ui.editTeam = null; render(); },
+  cancelEdit: () => { clearPhotoDraft(ui.editTeam); ui.editTeam = null; render(); },
+  removePhoto: (d) => { clearPhotoDraft(d.key); ui.photo[d.key] = { remove: true }; render(); },
   toggleStatus: (d) => {
     const t = S.teams.find((x) => x.id === d.id);
     return op('updateTeam', { id: d.id, status: t.status === 'active' ? 'paused' : 'active' });
@@ -859,8 +937,20 @@ document.addEventListener('click', (ev) => {
   fn({ ...el.dataset });
 });
 
-document.addEventListener('change', (ev) => {
+document.addEventListener('change', async (ev) => {
   const el = ev.target;
+  if (el.dataset?.photo && el.files?.[0]) {
+    const key = el.dataset.photo;
+    try {
+      const blob = await shrinkPhoto(el.files[0]);
+      clearPhotoDraft(key);
+      ui.photo[key] = { blob, url: URL.createObjectURL(blob) };
+    } catch {
+      toast('Kunde inte läsa bilden', true);
+    }
+    render();
+    return;
+  }
   if (el.dataset?.act !== 'guess') return;
   const v = el.value === '' ? null : Number(el.value);
   op('setGuess', { team: el.dataset.team, guess: v });
@@ -878,12 +968,17 @@ document.addEventListener('submit', async (ev) => {
       toast('Utropet visas på storskärmen');
     }
   } else if (kind === 'addTeam') {
-    if (await op('addTeam', data)) {
+    const res = await op('addTeam', data);
+    if (res) {
+      if (res.id) await savePhoto(res.id, 'new');
       ui.addOpen = false;
       toast(`${data.name} är anmält!`);
     }
   } else if (kind === 'editTeam') {
-    if (await op('updateTeam', { id: form.dataset.id, ...data })) ui.editTeam = null;
+    if (await op('updateTeam', { id: form.dataset.id, ...data })) {
+      await savePhoto(form.dataset.id, form.dataset.id);
+      ui.editTeam = null;
+    }
   }
   render();
 });

@@ -2,7 +2,7 @@
 // Körs direkt av Node 24 (inbyggd TypeScript-typstrippning), inga beroenden.
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, mkdir, rm } from 'node:fs/promises';
 import { join, extname, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GREN_IDS, LEK_IDS, LEKAR, QUIZ, MUSIC } from './public/grenar.js';
@@ -18,6 +18,8 @@ interface Team {
   motto: string;
   status: TeamStatus;
   created: number;
+  // Tidpunkt då bilden laddades upp, används för att undvika gammal cache. Saknas = ingen bild.
+  photo?: number;
 }
 interface GameEntry { r: Result; pen: number }
 interface QuizEntry { q: number[]; bonus: number }
@@ -53,6 +55,11 @@ const DATA_DIR = process.env.DATA_DIR ?? './data';
 const ADMIN_PIN = process.env.ADMIN_PIN ?? '';
 const PUBLIC_DIR = resolve(import.meta.dirname, 'public');
 const STATE_FILE = join(DATA_DIR, 'state.json');
+const PHOTO_DIR = join(DATA_DIR, 'photos');
+const PHOTO_MAX = 3_000_000;
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const PHOTO_API = new RegExp(`^/api/teams/(${UUID})/photo$`);
+const PHOTO_URL = new RegExp(`^/photos/(${UUID})\\.jpg$`);
 const QUIZ_LEN = QUIZ.sentences.length;
 const SONG_LEN = MUSIC.songCount;
 
@@ -98,6 +105,12 @@ function save(): Promise<void> {
     await rename(tmp, STATE_FILE);
   }).catch((err: unknown) => console.error('Kunde inte spara:', err));
   return saveChain;
+}
+
+const photoFile = (teamId: string): string => join(PHOTO_DIR, `${teamId}.jpg`);
+
+function removePhoto(teamId: string): void {
+  rm(photoFile(teamId), { force: true }).catch((err: unknown) => console.error('Kunde inte ta bort bild:', err));
 }
 
 function broadcast(): void {
@@ -155,14 +168,15 @@ function gameName(id: string): string {
 
 // --- operationer ---------------------------------------------------------
 
-function apply(op: Op): void {
+function apply(op: Op): string | void {
   switch (op.type) {
     case 'addTeam': {
       const name = str(op.name, 60);
       if (!name) throw new HttpError(400, 'Laget måste ha ett namn');
-      state.teams.push({ id: randomUUID(), name, members: str(op.members, 200), motto: str(op.motto, 200), status: 'active', created: Date.now() });
+      const id = randomUUID();
+      state.teams.push({ id, name, members: str(op.members, 200), motto: str(op.motto, 200), status: 'active', created: Date.now() });
       log(`Nytt lag: ${name}`);
-      break;
+      return id;
     }
     case 'updateTeam': {
       const team = teamOf(op.id);
@@ -182,6 +196,7 @@ function apply(op: Op): void {
       for (const g of Object.values(state.games)) delete g[team.id];
       delete state.quiz[team.id];
       delete state.music[team.id];
+      removePhoto(team.id);
       log(`Lag borttaget: ${team.name}`);
       break;
     }
@@ -266,6 +281,7 @@ function apply(op: Op): void {
     case 'reset': {
       const keepTeams = op.keepTeams === true;
       const teams = keepTeams ? state.teams : [];
+      if (!keepTeams) for (const t of state.teams) removePhoto(t.id);
       state = { ...emptyState(), teams, disabled: state.disabled, version: state.version };
       log(keepTeams ? 'Alla poäng nollställda' : 'Allt nollställt');
       break;
@@ -301,15 +317,25 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
+async function readRaw(req: IncomingMessage, limit: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
     size += chunk.length;
-    if (size > 64_000) throw new HttpError(413, 'För stor förfrågan');
+    if (size > limit) throw new HttpError(413, 'För stor förfrågan');
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  return (await readRaw(req, 64_000)).toString('utf8');
+}
+
+async function commit(): Promise<void> {
+  state.version++;
+  await save();
+  broadcast();
 }
 
 async function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void> {
@@ -353,6 +379,34 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return sendJson(res, 200, FACIT);
   }
 
+  const photoApi = PHOTO_API.exec(pathname);
+  if (photoApi && (req.method === 'POST' || req.method === 'DELETE')) {
+    checkPin(req, req.headers['x-admin-pin']);
+    const team = teamOf(photoApi[1]);
+    if (req.method === 'DELETE') {
+      removePhoto(team.id);
+      delete team.photo;
+    } else {
+      // Webbläsaren skalar alltid om bilden till JPEG innan uppladdning.
+      const data = await readRaw(req, PHOTO_MAX);
+      if (data.length < 3 || data[0] !== 0xff || data[1] !== 0xd8 || data[2] !== 0xff) throw new HttpError(400, 'Bilden måste vara JPEG');
+      await mkdir(PHOTO_DIR, { recursive: true });
+      await writeFile(photoFile(team.id), data);
+      team.photo = Date.now();
+    }
+    await commit();
+    return sendJson(res, 200, { ok: true, version: state.version });
+  }
+
+  const photoUrl = PHOTO_URL.exec(pathname);
+  if (photoUrl && (req.method === 'GET' || req.method === 'HEAD')) {
+    const data = await readFile(photoFile(photoUrl[1])).catch(() => null);
+    if (!data) throw new HttpError(404, 'Hittades inte');
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
+    res.end(req.method === 'HEAD' ? undefined : data);
+    return;
+  }
+
   if (pathname === '/api/op' && req.method === 'POST') {
     checkPin(req, req.headers['x-admin-pin']);
     let op: Op;
@@ -363,11 +417,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       throw new HttpError(400, 'Ogiltig JSON');
     }
     if (typeof op !== 'object' || op === null || typeof op.type !== 'string') throw new HttpError(400, 'Ogiltig operation');
-    apply(op);
-    state.version++;
-    await save();
-    broadcast();
-    return sendJson(res, 200, { ok: true, version: state.version });
+    const id = apply(op);
+    await commit();
+    return sendJson(res, 200, { ok: true, version: state.version, ...(id ? { id } : {}) });
   }
 
   if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res, pathname);

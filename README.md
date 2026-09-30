@@ -14,7 +14,7 @@ Vid lika totalpoäng avgör utslagsfrågan: den som är närmast 4 utan att gå 
 
 - **Topplista**: pallen och övriga lag. Den är gjord för storskärm och uppdateras live. Knappen *Storskärm* växlar till helskärm.
 - **Poängutdelning** *(bara domare)*: domarbordet. Här finns flikar per gren, snabbknappar och facit till quizen, utrop till salen och en händelselogg.
-- **Deltagare & Lag**: alla ser lagen. Domare kan också lägga till, redigera, pausa och ta bort lag, ladda ner en säkerhetskopia eller nollställa.
+- **Deltagare & Lag**: alla ser lagen. Domare kan också lägga till, redigera, pausa och ta bort lag, ladda ner en säkerhetskopia eller nollställa. Varje lag kan få en bild: *Ta foto* öppnar kameran på mobilen och *Välj bild* hämtar från galleriet. Bilden visas på lagkortet, i topplistan och på pallen.
 - **Grenar & Regler**: alla regler, tungvrickarna och hur långt kvällen har kommit. Domare kan stänga av grenar som inte blir av. De döljs då för gästerna och poängen från dem räknas inte, men sparas om grenen sätts på igen.
 
 Gäster ser bara topplistan, lagen och reglerna. Domarna loggar in med knappen **🔒 Domare** uppe till höger och anger PIN-koden en gång. Då visas poängutdelningen och alla verktyg, och inloggningen sparas i webbläsaren tills man loggar ut.
@@ -57,7 +57,7 @@ docker compose up -d
 | `HOST_PORT` | `8090` | Porten på servern när du kör med compose eller Portainer. |
 | `ADMIN_PIN` | *(tom)* | PIN-koden för domarinloggningen. Sätt alltid en, annars kan vem som helst logga in som domare och se facit. |
 | `PORT` | `3000` | Porten inuti containern. |
-| `DATA_DIR` | `/data` | Här sparas `state.json`. Montera en volym så att poängen överlever en omstart. |
+| `DATA_DIR` | `/data` | Här sparas `state.json` och lagbilderna (`photos/`). Montera en volym så att poäng och bilder överlever en omstart. Säkerhetskopian från appen innehåller inte bilderna. |
 
 Exempel: `docker run -e ADMIN_PIN=1516 ...`
 
