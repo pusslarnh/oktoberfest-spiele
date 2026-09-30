@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oktoberfest Spiele</title>
+  <meta name="theme-color" content="#1c140e">
+  <link rel="icon" href="logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#topplista">
+      <img src="logo.png" alt="" width="36" height="36">
+      <span>Oktoberfest Spiele</span>
+    </a>
+    <span class="live-pill" id="livePill"><i></i><span>O’zapft is!</span></span>
+    <nav class="nav" id="nav">
+      <a href="#topplista" data-route="topplista">Topplista</a>
+      <a href="#poang" data-route="poang">Poängutdelning</a>
+      <a href="#lag" data-route="lag">Deltagare &amp; Lag</a>
+      <a href="#grenar" data-route="grenar">Grenar &amp; Regler</a>
+    </nav>
+    <button class="btn ghost" id="fullscreenBtn" type="button" title="Storskärmsläge">⛶ <span>Storskärm</span></button>
+  </header>
+  <div class="ribbon" aria-hidden="true"></div>
+
+  <main id="view" class="view"></main>
+
+  <footer class="footer">
+    <span><b>Oktoberfest Spiele</b> · Officiellt mästerskapssystem</span>
+    <span>Oktoberfest 3 oktober · Gemütlichkeit &amp; sportsmanship</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="pinDialog" class="modal">
+    <form method="dialog" id="pinForm">
+      <h3>Domarens PIN-kod</h3>
+      <p>Poängsättningen är låst. Ange PIN-koden från festkommittén.</p>
+      <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" required>
+      <div class="row end">
+        <button class="btn ghost" value="cancel" formnovalidate>Avbryt</button>
+        <button class="btn gold" value="ok">Lås upp</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

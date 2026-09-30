@@ -1,0 +1,17 @@
+services:
+  oktoberfest:
+    build: .
+    # Eller använd den färdiga bilden från GitHub Container Registry:
+    # image: ghcr.io/pusslarnh/oktoberfest-spiele:latest
+    container_name: oktoberfest-spiele
+    ports:
+      - "8080:3000"
+    environment:
+      # Sätt en PIN-kod så att bara domarna kan dela ut poäng (tomt = ingen PIN).
+      ADMIN_PIN: "${ADMIN_PIN:-}"
+    volumes:
+      - oktoberfest-data:/data
+    restart: unless-stopped
+
+volumes:
+  oktoberfest-data:

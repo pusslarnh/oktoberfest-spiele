@@ -1,0 +1,17 @@
+# Klistra in i Portainer → Stacks → Add stack → Web editor.
+# Kräver att GitHub Actions har publicerat imagen till ghcr.io (och att paketet är Public).
+services:
+  oktoberfest:
+    image: ghcr.io/pusslarnh/oktoberfest-spiele:latest
+    container_name: oktoberfest-spiele
+    ports:
+      - "8080:3000"
+    environment:
+      # Sätts under "Environment variables" i Portainer (tomt = ingen PIN).
+      ADMIN_PIN: "${ADMIN_PIN:-}"
+    volumes:
+      - oktoberfest-data:/data
+    restart: unless-stopped
+
+volumes:
+  oktoberfest-data:

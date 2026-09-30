@@ -1,0 +1,12 @@
+{
+  "name": "oktoberfest-spiele",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live-poängtavla för Oktoberfest-lekar, meningsquiz och musikquiz",
+  "type": "module",
+  "engines": { "node": ">=23.6" },
+  "scripts": {
+    "start": "node server.ts",
+    "dev": "node --watch server.ts"
+  }
+}
