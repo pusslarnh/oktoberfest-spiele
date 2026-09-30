@@ -4,7 +4,7 @@ En live-poängtavla för Oktoberfest den 3 oktober. Tavlan följer quizpaketets 
 
 | Gren | Poäng |
 | --- | --- |
-| 12 lekar (Masskrugstemmen, Hammerschlagen, Fingerhakeln, Bierdeckel schnippen, Brezelschnappen, Gummistiefelweitwurf, Kellnerlauf, Reise nach Jerusalem, Zungenbrecher, Trachtenschau, Verbotenes Wort, Ein Prosit) | **3p** för vinst, **1p** för deltagande. Minuspoäng för böjd spik (Hammerschlagen) och missad skål (Ein Prosit), −1p per gång |
+| 12 lekar (Masskrugstemmen, Hammerschlagen, Fingerhakeln, Bierdeckel schnippen, Brezelschnappen, Gummistiefelweitwurf, Kellnerlauf, Reise nach Jerusalem, Zungenbrecher, Trachtenschau, Verbotenes Wort, Ein Prosit) | **3p** för vinst, **1p** för deltagande. Minuspoäng för böjd spik (Hammerschlagen), missad skål (Ein Prosit) och sagt öl (Verbotenes Wort), −1p per gång |
 | Meningsquiz (blatt 2) | 18 meningar × 1p, där halv poäng går bra, plus bonus 2p. Max **20p** |
 | Musikquiz (blatt 4) | 12 låtar × (artist 1p + låt 1p) plus utslagsfråga 1p. Max **25p** |
 
@@ -15,7 +15,7 @@ Vid lika totalpoäng avgör utslagsfrågan: den som är närmast 4 utan att gå 
 - **Topplista**: pallen och övriga lag. Den är gjord för storskärm och uppdateras live. Knappen *Storskärm* växlar till helskärm.
 - **Poängutdelning** *(bara domare)*: domarbordet. Här finns flikar per gren, snabbknappar och facit till quizen, utrop till salen och en händelselogg.
 - **Deltagare & Lag**: alla ser lagen. Domare kan också lägga till, redigera, pausa och ta bort lag, ladda ner en säkerhetskopia eller nollställa.
-- **Grenar & Regler**: alla regler, tungvrickarna och hur långt kvällen har kommit.
+- **Grenar & Regler**: alla regler, tungvrickarna och hur långt kvällen har kommit. Domare kan stänga av grenar som inte blir av. De döljs då för gästerna och poängen från dem räknas inte, men sparas om grenen sätts på igen.
 
 Gäster ser bara topplistan, lagen och reglerna. Domarna loggar in med knappen **🔒 Domare** uppe till höger och anger PIN-koden en gång. Då visas poängutdelningen och alla verktyg, och inloggningen sparas i webbläsaren tills man loggar ut.
 

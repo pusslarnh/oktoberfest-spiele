@@ -413,7 +413,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .empty p { margin: 8px 0 20px; }
 
 /* --- grenar --- */
-.timeline { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
+.timeline { display: grid; grid-template-columns: repeat(var(--n, 14), 1fr); gap: 4px; }
 .step { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: 0; cursor: pointer; padding: 0 0 4px; color: var(--dim); font: 700 11px var(--mono); }
 .step .bar { width: 100%; height: 8px; border-radius: 999px; background: var(--card-2); }
 .step.done .bar { background: var(--gold); }
@@ -428,6 +428,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .gold-card b { color: var(--gold-hi); }
 .gren-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
 .gren-card { display: flex; flex-direction: column; gap: 4px; }
+.gren-card.off { opacity: .55; }
 .gren-card .well { margin-top: 10px; }
 .gren-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; }
 .twisters { margin: 6px 0 0; padding-left: 20px; }

@@ -63,8 +63,9 @@ export const LEKAR = [
   },
   {
     id: 'verboten', icon: '🤫', sv: 'Förbjudna ordet', de: 'Verbotenes Wort',
-    desc: 'Hela kvällen heter det Bier, aldrig öl. Den som säger fel ord och blir påkommen bjuder nästa runda. Avslöja regeln när första gästen kliver in.',
+    desc: 'Hela kvällen heter det Bier, aldrig öl. Den som säger fel ord och blir påkommen ger laget en minuspoäng. Avslöja regeln när första gästen kliver in.',
     kit: 'Inget alls',
+    penalty: { label: 'Sagt öl', value: -1 },
   },
   {
     id: 'prosit', icon: '🥂', sv: 'Skålritualen', de: 'Ein Prosit',

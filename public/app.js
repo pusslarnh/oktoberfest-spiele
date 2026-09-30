@@ -1,4 +1,4 @@
-import { LEKAR, QUIZ, MUSIC, ALL_GRENAR, WIN_POINTS, PART_POINTS, MAX_LEKAR, MAX_TOTAL } from './grenar.js';
+import { LEKAR, QUIZ, MUSIC, ALL_GRENAR, WIN_POINTS, PART_POINTS } from './grenar.js';
 
 // --- tillstånd -------------------------------------------------------------
 
@@ -34,8 +34,12 @@ function store(key, value) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','));
 const signed = (n) => (n > 0 ? `+${fmt(n)}` : fmt(n));
-const grenById = (id) => ALL_GRENAR.find((g) => g.id === id);
-const grenIndex = (id) => ALL_GRENAR.findIndex((g) => g.id === id);
+// Avstängda grenar döljs för gästerna och deras poäng räknas inte.
+const isOn = (id) => !S?.disabled?.includes(id);
+const grenar = () => ALL_GRENAR.filter((g) => isOn(g.id));
+const grenIndex = (id) => grenar().findIndex((g) => g.id === id);
+const maxLekar = () => LEKAR.filter((l) => isOn(l.id)).length * WIN_POINTS;
+const maxTotal = () => maxLekar() + (isOn(QUIZ.id) ? QUIZ.max : 0) + (isOn(MUSIC.id) ? MUSIC.max : 0);
 const isLek = (id) => LEKAR.some((l) => l.id === id);
 
 // --- poängberäkning --------------------------------------------------------
@@ -76,13 +80,13 @@ function scoreboard() {
     for (const lek of LEKAR) {
       const p = lekPoints(S.games[lek.id]?.[team.id], lek);
       perGame[lek.id] = p;
-      lekar += p;
+      if (isOn(lek.id)) lekar += p;
     }
-    const quiz = quizPoints(S.quiz[team.id]);
-    const music = musicPoints(S.music[team.id]);
+    const quiz = isOn(QUIZ.id) ? quizPoints(S.quiz[team.id]) : 0;
+    const music = isOn(MUSIC.id) ? musicPoints(S.music[team.id]) : 0;
     perGame[QUIZ.id] = quiz;
     perGame[MUSIC.id] = music;
-    return { team, perGame, lekar, quiz, music, total: lekar + quiz + music, tie: tieDistance(S.music[team.id]) };
+    return { team, perGame, lekar, quiz, music, total: lekar + quiz + music, tie: isOn(MUSIC.id) ? tieDistance(S.music[team.id]) : Infinity };
   });
   rows.sort((a, b) => b.total - a.total || a.tie - b.tie || a.team.name.localeCompare(b.team.name, 'sv'));
   rows.forEach((row, i) => {
@@ -259,7 +263,11 @@ function deltaBadge(teamId) {
 }
 
 function splitLine(row) {
-  return `<span>Lekar <b>${fmt(row.lekar)}</b></span><span>Meningar <b>${fmt(row.quiz)}</b></span><span>Musik <b>${fmt(row.music)}</b></span>`;
+  return [
+    `<span>Lekar <b>${fmt(row.lekar)}</b></span>`,
+    isOn(QUIZ.id) ? `<span>Meningar <b>${fmt(row.quiz)}</b></span>` : '',
+    isOn(MUSIC.id) ? `<span>Musik <b>${fmt(row.music)}</b></span>` : '',
+  ].join('');
 }
 
 function emptyTeams() {
@@ -350,11 +358,13 @@ function viewTopplista() {
 }
 
 function currentGrenCard() {
-  const g = grenById(S.current) ?? LEKAR[0];
+  const list = grenar();
+  if (!list.length) return '';
+  const g = list.find((x) => x.id === S.current) ?? list[0];
   const idx = grenIndex(g.id);
-  const next = ALL_GRENAR[idx + 1];
+  const next = list[idx + 1];
   return `<div class="card glow">
-      <div class="card-head"><span class="kicker dot">Aktuell gren</span><span class="tag">Gren ${idx + 1} av ${ALL_GRENAR.length}</span></div>
+      <div class="card-head"><span class="kicker dot">Aktuell gren</span><span class="tag">Gren ${idx + 1} av ${list.length}</span></div>
       <div class="gren-title"><span class="gren-icon">${g.icon}</span><div><h2 class="headline">${esc(g.sv)}</h2><div class="de">${esc(g.de)}</div></div></div>
       <p class="muted">${esc(g.desc)}</p>
       ${scoringChips(g)}
@@ -366,12 +376,13 @@ function currentGrenCard() {
 }
 
 function progressCard() {
-  const done = ALL_GRENAR.filter((g) => grenDone(g.id)).length;
-  const pct = Math.round((done / ALL_GRENAR.length) * 100);
+  const list = grenar();
+  const done = list.filter((g) => grenDone(g.id)).length;
+  const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   return `<div class="card">
-    <div class="card-head"><span class="kicker">🍺 Stämningsmätare</span><b class="gold">${done} / ${ALL_GRENAR.length} grenar</b></div>
+    <div class="card-head"><span class="kicker">🍺 Stämningsmätare</span><b class="gold">${done} / ${list.length} grenar</b></div>
     <div class="meter"><span style="width:${pct}%"></span></div>
-    <div class="row between small muted"><span>Max möjligt: ${MAX_TOTAL} p per lag</span><span>${pct}% avklarat</span></div>
+    <div class="row between small muted"><span>Max möjligt: ${maxTotal()} p per lag</span><span>${pct}% avklarat</span></div>
   </div>`;
 }
 
@@ -420,12 +431,13 @@ function scoringChips(g) {
 // Poängutdelning -----------------------------------------------------------
 
 function viewPoang() {
-  const gid = ui.game ?? S.current ?? LEKAR[0].id;
-  const g = grenById(gid) ?? LEKAR[0];
+  const list = grenar();
+  if (!list.length) return '<div class="empty card"><h2>Alla grenar är avstängda</h2><p class="muted">Sätt på grenar under Grenar &amp; Regler.</p><a class="btn gold" href="#grenar">Till Grenar &amp; Regler</a></div>';
+  const g = list.find((x) => x.id === (ui.game ?? S.current)) ?? list.find((x) => x.id === S.current) ?? list[0];
   const idx = grenIndex(g.id);
   const rows = scoreboard();
 
-  const tabs = ALL_GRENAR.map((x, i) => `<button class="tab ${x.id === g.id ? 'on' : ''}" data-act="pickGame" data-id="${x.id}" type="button">
+  const tabs = list.map((x, i) => `<button class="tab ${x.id === g.id ? 'on' : ''}" data-act="pickGame" data-id="${x.id}" type="button">
       <span>${x.icon}</span>${esc(x.sv)}${x.id === S.current ? '<i class="live-dot" title="Visas på storskärmen"></i>' : ''}${grenDone(x.id) && x.id !== g.id ? '<i class="done">✓</i>' : ''}
       <small>${i + 1}</small>
     </button>`).join('');
@@ -445,7 +457,7 @@ function viewPoang() {
         <div class="card gren-header">
           <span class="gren-icon lg">${g.icon}</span>
           <div class="grow">
-            <div class="kicker"><span class="tag gold">Gren ${idx + 1} av ${ALL_GRENAR.length}</span> ${S.current === g.id ? '<span class="tag live">● På storskärmen</span>' : ''}</div>
+            <div class="kicker"><span class="tag gold">Gren ${idx + 1} av ${list.length}</span> ${S.current === g.id ? '<span class="tag live">● På storskärmen</span>' : ''}</div>
             <h1 class="headline-xl">${esc(g.sv)} <span class="de">${esc(g.de)}</span></h1>
             <p class="muted">${esc(g.desc)}</p>
             ${scoringChips(g)}
@@ -497,7 +509,7 @@ function lekScoring(g, rows) {
     </article>`;
   }).join('');
   const hint = g.id === 'verboten'
-    ? '<p class="note">Den som säger ”öl” och blir påkommen bjuder nästa runda – det ger inga minuspoäng, bara törst.</p>'
+    ? '<p class="note">Säger någon ”öl” och blir påkommen trycker du + vid ”Sagt öl” på lagets kort. Varje gång ger −1p.</p>'
     : g.id === 'kellner'
       ? '<p class="note">Tiden avgör: lägg på fem sekunder för varje spillt glas innan vinnaren utses.</p>'
       : '';
@@ -669,7 +681,7 @@ function confirmBtn(key, label, act, data = '') {
 
 function viewLag() {
   const rows = scoreboard();
-  const done = ALL_GRENAR.filter((g) => grenDone(g.id)).length;
+  const done = grenar().filter((g) => grenDone(g.id)).length;
   const cards = rows.map((row) => {
     const t = row.team;
     if (admin && ui.editTeam === t.id) return teamForm(t);
@@ -704,7 +716,7 @@ function viewLag() {
       <div class="stats">
         <div><label>Registrerade lag</label><b>${S.teams.length}</b></div>
         <div><label>Deltagare</label><b>${countMembers()}</b></div>
-        <div><label>Grenar klara</label><b>${done} / ${ALL_GRENAR.length}</b></div>
+        <div><label>Grenar klara</label><b>${done} / ${grenar().length}</b></div>
       </div>
     </div>
     ${admin ? `<div class="toolbar card">
@@ -726,8 +738,9 @@ function viewLag() {
 // Grenar & regler ----------------------------------------------------------
 
 function viewGrenar() {
-  const done = ALL_GRENAR.filter((g) => grenDone(g.id)).length;
-  const timeline = ALL_GRENAR.map((g, i) => {
+  const list = grenar();
+  const done = list.filter((g) => grenDone(g.id)).length;
+  const timeline = list.map((g, i) => {
     const cls = g.id === S.current ? 'live' : grenDone(g.id) ? 'done' : '';
     const tag = admin ? 'button' : 'div';
     const attrs = admin ? `data-act="goScore" data-id="${g.id}" type="button"` : '';
@@ -736,8 +749,11 @@ function viewGrenar() {
     </${tag}>`;
   }).join('');
 
-  const cards = ALL_GRENAR.map((g, i) => {
-    const status = g.id === S.current ? '<span class="tag live">● Pågår nu</span>' : grenDone(g.id) ? '<span class="tag">Avklarad</span>' : '<span class="tag">Kommande</span>';
+  // Domaren ser även avstängda grenar, så att de kan sättas på igen.
+  const cards = (admin ? ALL_GRENAR : list).map((g) => {
+    const on = isOn(g.id);
+    const i = grenIndex(g.id);
+    const status = !on ? '<span class="tag">Avstängd</span>' : g.id === S.current ? '<span class="tag live">● Pågår nu</span>' : grenDone(g.id) ? '<span class="tag">Avklarad</span>' : '<span class="tag">Kommande</span>';
     let extra = '';
     if (g.twisters) {
       extra = `<div class="well"><label>Tungvrickare</label><ol class="twisters">${g.twisters.map((t) => `<li><b>${esc(t.de)}</b><span>${esc(t.sv)}</span></li>`).join('')}</ol></div>`;
@@ -746,8 +762,8 @@ function viewGrenar() {
     } else if (g.id === MUSIC.id) {
       extra = `<div class="well"><label>Utslagsfråga · 1 poäng</label><p class="small">${esc(MUSIC.tiebreak.q)} Närmast utan att gå över vinner vid lika totalpoäng.</p></div>`;
     }
-    return `<article class="card gren-card ${g.id === S.current ? 'glow' : ''}">
-      <div class="card-head"><div class="row"><span class="tag gold">Gren ${i + 1}</span>${status}</div><span class="gren-icon">${g.icon}</span></div>
+    return `<article class="card gren-card ${on && g.id === S.current ? 'glow' : ''} ${on ? '' : 'off'}">
+      <div class="card-head"><div class="row">${on ? `<span class="tag gold">Gren ${i + 1}</span>` : ''}${status}</div><span class="gren-icon">${g.icon}</span></div>
       <h3 class="headline">${esc(g.sv)}</h3>
       <div class="de">${esc(g.de)}</div>
       <p>${esc(g.desc)}</p>
@@ -756,8 +772,9 @@ function viewGrenar() {
       <div class="gren-foot">
         <span class="muted small"><b>Behövs:</b> ${esc(g.kit)}</span>
         ${admin ? `<div class="row">
-          ${g.id !== S.current ? `<button class="btn ghost sm" data-act="setCurrent" data-id="${g.id}" type="button">📺 Starta</button>` : ''}
-          <button class="btn gold sm" data-act="goScore" data-id="${g.id}" type="button">Poängsätt →</button>
+          <button class="btn ghost sm" data-act="toggleGren" data-id="${g.id}" data-on="${!on}" type="button">${on ? '⏸ Stäng av' : '▶ Sätt på'}</button>
+          ${on && g.id !== S.current ? `<button class="btn ghost sm" data-act="setCurrent" data-id="${g.id}" type="button">📺 Starta</button>` : ''}
+          ${on ? `<button class="btn gold sm" data-act="goScore" data-id="${g.id}" type="button">Poängsätt →</button>` : ''}
         </div>` : ''}
       </div>
     </article>`;
@@ -768,21 +785,21 @@ function viewGrenar() {
       <div>
         <div class="kicker">Oktoberfest 3 oktober · Huvudreglemente</div>
         <h1 class="display">Grenar &amp; Tävlingsregler</h1>
-        <p class="muted">Tolv lekar, meningsquiz och musikquiz. Allt går att köra med vatten i sejdlarna. Utse en Festleiter som visslar mellan momenten.</p>
+        <p class="muted">Lekar, meningsquiz och musikquiz. Allt går att köra med vatten i sejdlarna. Utse en Festleiter som visslar mellan momenten.</p>
       </div>
     </div>
     <div class="card">
-      <div class="card-head"><div><span class="kicker">Mästerskapsstatus</span><h2 class="headline">${done} av ${ALL_GRENAR.length} grenar avklarade</h2></div></div>
-      <div class="timeline">${timeline}</div>
+      <div class="card-head"><div><span class="kicker">Mästerskapsstatus</span><h2 class="headline">${done} av ${list.length} grenar avklarade</h2></div></div>
+      <div class="timeline" style="--n:${list.length}">${timeline}</div>
     </div>
     <div class="max-grid">
-      <div class="card"><label>Lekar</label><b>${LEKAR.length} × ${WIN_POINTS}p</b><span>Max ${MAX_LEKAR}p · ${PART_POINTS}p för deltagande</span></div>
-      <div class="card"><label>Meningsquiz</label><b>${QUIZ.max}p</b><span>18 meningar + 2p bonus</span></div>
-      <div class="card"><label>Musikquiz</label><b>${MUSIC.max}p</b><span>12 låtar × 2p + utslagsfråga</span></div>
-      <div class="card gold-card"><label>Totalt max</label><b>${MAX_TOTAL}p</b><span>Prisutdelning efter musikquizet</span></div>
+      <div class="card"><label>Lekar</label><b>${maxLekar() / WIN_POINTS} × ${WIN_POINTS}p</b><span>Max ${maxLekar()}p · ${PART_POINTS}p för deltagande</span></div>
+      <div class="card"><label>Meningsquiz</label><b>${isOn(QUIZ.id) ? `${QUIZ.max}p` : 'Avstängd'}</b><span>18 meningar + 2p bonus</span></div>
+      <div class="card"><label>Musikquiz</label><b>${isOn(MUSIC.id) ? `${MUSIC.max}p` : 'Avstängd'}</b><span>12 låtar × 2p + utslagsfråga</span></div>
+      <div class="card gold-card"><label>Totalt max</label><b>${maxTotal()}p</b><span>Prisutdelning efter musikquizet</span></div>
     </div>
     <div class="gren-grid">${cards}</div>
-    <div class="card info"><span>ⓘ</span><p><b>Protest eller regelfrågor?</b> Festleitern har sista ordet – och den som säger ”öl” istället för ”Bier” bjuder nästa runda.</p></div>`;
+    <div class="card info"><span>ⓘ</span><p><b>Protest eller regelfrågor?</b> Festleitern har sista ordet – och den som säger ”öl” istället för ”Bier” ger laget en minuspoäng.</p></div>`;
 }
 
 // --- händelser -------------------------------------------------------------
@@ -792,6 +809,7 @@ const actions = {
   goScore: (d) => { ui.game = d.id; location.hash = 'poang'; },
   pickTeam: (d) => { ui[d.key] = d.id; render(); },
   toggleFacit: () => { ui.showFacit = !ui.showFacit; render(); },
+  toggleGren: (d) => op('setGrenOn', { game: d.id, on: d.on === 'true' }).then((ok) => ok && toast(d.on === 'true' ? 'Grenen är på' : 'Grenen är avstängd')),
   setCurrent: (d) => op('setCurrent', { game: d.id }).then((ok) => ok && toast('Grenen visas nu på storskärmen')),
   setGame: (d) => op('setGame', { game: d.game, team: d.team, r: d.r }),
   pen: (d) => op('setGame', { game: d.game, team: d.team, pen: Number(d.v) }),

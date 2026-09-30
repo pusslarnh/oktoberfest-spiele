@@ -34,6 +34,8 @@ interface State {
   log: LogEntry[];
   current: string;
   announce: string;
+  // Grenar som domaren har stängt av. Poängen sparas men räknas inte.
+  disabled: string[];
 }
 
 type Op = Record<string, unknown> & { type: string };
@@ -69,7 +71,7 @@ const MIME: Record<string, string> = {
 };
 
 function emptyState(): State {
-  return { version: 0, teams: [], games: {}, quiz: {}, music: {}, log: [], current: LEK_IDS[0], announce: '' };
+  return { version: 0, teams: [], games: {}, quiz: {}, music: {}, log: [], current: LEK_IDS[0], announce: '', disabled: [] };
 }
 
 let state: State = emptyState();
@@ -239,9 +241,19 @@ function apply(op: Op): void {
       log(`${team.name} · ${gameName(game)}: rättat`, pts);
       break;
     }
+    case 'setGrenOn': {
+      const game = String(op.game);
+      if (!GREN_IDS.includes(game)) throw new HttpError(400, 'Okänd gren');
+      const on = op.on === true;
+      state.disabled = on ? state.disabled.filter((id) => id !== game) : [...new Set([...state.disabled, game])];
+      if (!on && state.current === game) state.current = GREN_IDS.find((id) => !state.disabled.includes(id)) ?? state.current;
+      log(`${gameName(game)}: ${on ? 'aktiverad' : 'avstängd'}`);
+      break;
+    }
     case 'setCurrent': {
       const game = String(op.game);
       if (!GREN_IDS.includes(game)) throw new HttpError(400, 'Okänd gren');
+      if (state.disabled.includes(game)) throw new HttpError(400, 'Grenen är avstängd');
       state.current = game;
       log(`Aktuell gren: ${gameName(game)}`);
       break;
@@ -254,7 +266,7 @@ function apply(op: Op): void {
     case 'reset': {
       const keepTeams = op.keepTeams === true;
       const teams = keepTeams ? state.teams : [];
-      state = { ...emptyState(), teams, version: state.version };
+      state = { ...emptyState(), teams, disabled: state.disabled, version: state.version };
       log(keepTeams ? 'Alla poäng nollställda' : 'Allt nollställt');
       break;
     }
