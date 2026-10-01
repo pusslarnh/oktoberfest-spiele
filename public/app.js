@@ -7,6 +7,8 @@ const ui = {
   game: null,
   quizTeam: null,
   musicTeam: null,
+  // Valt antal extrapoäng per lag innan domaren trycker på Ge.
+  extraAmt: {},
   showFacit: false,
   editTeam: null,
   addOpen: false,
@@ -69,6 +71,10 @@ function musicPoints(entry) {
   return hits + (tiebreakOk(entry) ? 1 : 0);
 }
 
+function extraPoints(teamId) {
+  return (S.extra?.[teamId] ?? []).reduce((sum, e) => sum + e.pts, 0);
+}
+
 // Utslagsfrågan: närmast utan att gå över vinner vid lika poäng.
 function tieDistance(entry) {
   return entry?.dist ?? Infinity;
@@ -88,7 +94,8 @@ function scoreboard() {
     const music = isOn(MUSIC.id) ? musicPoints(S.music[team.id]) : 0;
     perGame[QUIZ.id] = quiz;
     perGame[MUSIC.id] = music;
-    return { team, perGame, lekar, quiz, music, total: lekar + quiz + music, tie: isOn(MUSIC.id) ? tieDistance(S.music[team.id]) : Infinity };
+    const extra = extraPoints(team.id);
+    return { team, perGame, lekar, quiz, music, extra, total: lekar + quiz + music + extra, tie: isOn(MUSIC.id) ? tieDistance(S.music[team.id]) : Infinity };
   });
   rows.sort((a, b) => b.total - a.total || a.tie - b.tie || a.team.name.localeCompare(b.team.name, 'sv'));
   rows.forEach((row, i) => {
@@ -327,6 +334,7 @@ function splitLine(row) {
     `<span>Lekar <b>${fmt(row.lekar)}</b></span>`,
     isOn(QUIZ.id) ? `<span>Meningar <b>${fmt(row.quiz)}</b></span>` : '',
     isOn(MUSIC.id) ? `<span>Musik <b>${fmt(row.music)}</b></span>` : '',
+    row.extra ? `<span>Extra <b>${signed(row.extra)}</b></span>` : '',
   ].join('');
 }
 
@@ -494,17 +502,41 @@ function scoringChips(g) {
 function viewPoang() {
   const list = grenar();
   if (!list.length) return '<div class="empty card"><h2>Alla grenar är avstängda</h2><p class="muted">Sätt på grenar under Grenar &amp; Regler.</p><a class="btn gold" href="#grenar">Till Grenar &amp; Regler</a></div>';
+  const onExtra = ui.game === 'extra';
   const g = list.find((x) => x.id === (ui.game ?? S.current)) ?? list.find((x) => x.id === S.current) ?? list[0];
   const idx = grenIndex(g.id);
   const rows = scoreboard();
 
-  const tabs = list.map((x, i) => `<button class="tab ${x.id === g.id ? 'on' : ''}" data-act="pickGame" data-id="${x.id}" type="button">
-      <span>${x.icon}</span>${esc(x.sv)}${x.id === S.current ? '<i class="live-dot" title="Visas på storskärmen"></i>' : ''}${grenDone(x.id) && x.id !== g.id ? '<i class="done">✓</i>' : ''}
+  const tabs = `<button class="tab ${onExtra ? 'on' : ''}" data-act="pickGame" data-id="extra" type="button"><span>⭐</span>Extrapoäng</button>` + list.map((x, i) => `<button class="tab ${x.id === g.id && !onExtra ? 'on' : ''}" data-act="pickGame" data-id="${x.id}" type="button">
+      <span>${x.icon}</span>${esc(x.sv)}${x.id === S.current ? '<i class="live-dot" title="Visas på storskärmen"></i>' : ''}${grenDone(x.id) && (x.id !== g.id || onExtra) ? '<i class="done">✓</i>' : ''}
       <small>${i + 1}</small>
     </button>`).join('');
 
   // Fast ordning (anmälningsordning) så att korten inte hoppar runt medan domaren klickar.
   const stable = S.teams.map((t) => rows.find((r) => r.team.id === t.id));
+  const side = `<aside class="side">
+        ${announceForm()}
+        ${miniStandings(rows)}
+        ${logCard(10)}
+      </aside>`;
+
+  if (onExtra) {
+    return `
+    <div class="tabs">${tabs}</div>
+    <div class="layout">
+      <section>
+        <div class="card gren-header">
+          <span class="gren-icon lg">⭐</span>
+          <div class="grow">
+            <h1 class="headline-xl">Extrapoäng <span class="de">Sonderpunkte</span></h1>
+            <p class="muted">Pluspoäng, eller minuspoäng, utanför grenarna. T.ex. för snyggaste dräkten eller bästa hejarklacken. Välj antal, skriv en anledning och tryck Ge. Anledningen syns i Senaste händelser.</p>
+          </div>
+        </div>
+        ${S.teams.length ? extraScoring(stable) : emptyTeams()}
+      </section>
+      ${side}
+    </div>`;
+  }
   let body;
   if (!S.teams.length) body = emptyTeams();
   else if (isLek(g.id)) body = lekScoring(g, stable);
@@ -531,12 +563,47 @@ function viewPoang() {
         </div>
         ${body}
       </section>
-      <aside class="side">
-        ${announceForm()}
-        ${miniStandings(rows)}
-        ${logCard(10)}
-      </aside>
+      ${side}
     </div>`;
+}
+
+function extraScoring(rows) {
+  const cards = rows.map((row) => {
+    const team = row.team;
+    const amt = ui.extraAmt[team.id] ?? 1;
+    const given = (S.extra?.[team.id] ?? []).slice().reverse().map((e) => `<li>
+        <b class="${e.pts < 0 ? 'neg' : 'gold'}">${signed(e.pts)}</b>
+        <span>${esc(e.reason) || '<i class="muted">Ingen anledning</i>'}</span>
+        <button class="x" data-act="removeExtra" data-team="${team.id}" data-id="${e.id}" type="button" aria-label="Ta bort extrapoängen" title="Ta bort">✕</button>
+      </li>`).join('');
+    // Hoppar över noll så att stegningen går direkt från +1 till −1.
+    const down = amt - 1 === 0 ? -1 : amt - 1;
+    const up = amt + 1 === 0 ? 1 : amt + 1;
+    return `<form class="score-card" data-form="extra" data-team="${team.id}">
+      <header>
+        <div>
+          <h3>${esc(team.name)}</h3>
+          <span class="members">${esc(team.members) || '&nbsp;'}</span>
+        </div>
+        ${team.photo ? avatar(team, 'sm') : ''}
+        <span class="rank-chip ${rankClass(row.rank)}">#${row.rank}</span>
+      </header>
+      <div class="now">
+        <div><label>Extra</label><b class="${row.extra < 0 ? 'neg' : ''}">${signed(row.extra)}</b></div>
+        <div><label>Totalt</label><b class="gold">${fmt(row.total)}</b></div>
+      </div>
+      <div class="stepper plus">
+        <span>Antal poäng</span>
+        <button data-act="extraAmt" data-team="${team.id}" data-v="${down}" type="button" ${amt <= -50 ? 'disabled' : ''} aria-label="Färre poäng">−</button>
+        <b class="${amt < 0 ? 'neg' : ''}">${signed(amt)}</b>
+        <button data-act="extraAmt" data-team="${team.id}" data-v="${up}" type="button" ${amt >= 50 ? 'disabled' : ''} aria-label="Fler poäng">+</button>
+      </div>
+      <input id="ex-reason-${team.id}" name="reason" maxlength="80" placeholder="Anledning, t.ex. snyggaste dräkten" autocomplete="off">
+      <button class="btn ${amt < 0 ? 'danger' : 'gold'}" type="submit">Ge ${signed(amt)}p</button>
+      ${given ? `<ul class="extra-list">${given}</ul>` : ''}
+    </form>`;
+  }).join('');
+  return `<div class="score-grid">${cards}</div>`;
 }
 
 function lekScoring(g, rows) {
@@ -702,14 +769,15 @@ function announceForm() {
 
 function miniStandings(rows) {
   if (!rows.length) return '';
+  const anyExtra = rows.some((r) => r.extra);
   return `<div class="card">
     <div class="card-head"><span class="kicker">Ställning</span><a class="link" href="#topplista">Storskärm →</a></div>
     <table class="mini">
-      <thead><tr><th>#</th><th>Lag</th><th title="Lekar">L</th><th title="Meningar">M</th><th title="Musik">Q</th><th>Tot</th></tr></thead>
+      <thead><tr><th>#</th><th>Lag</th><th title="Lekar">L</th><th title="Meningar">M</th><th title="Musik">Q</th>${anyExtra ? '<th title="Extrapoäng">E</th>' : ''}<th>Tot</th></tr></thead>
       <tbody>${rows.map((r) => `<tr>
         <td><span class="rank-chip sm ${rankClass(r.rank)}">${r.rank}</span></td>
         <td class="name">${esc(r.team.name)}</td>
-        <td>${fmt(r.lekar)}</td><td>${fmt(r.quiz)}</td><td>${fmt(r.music)}</td>
+        <td>${fmt(r.lekar)}</td><td>${fmt(r.quiz)}</td><td>${fmt(r.music)}</td>${anyExtra ? `<td>${signed(r.extra)}</td>` : ''}
         <td class="gold"><b>${fmt(r.total)}</b></td>
       </tr>`).join('')}</tbody>
     </table>
@@ -890,6 +958,8 @@ const actions = {
   setCurrent: (d) => op('setCurrent', { game: d.id }).then((ok) => ok && toast('Grenen visas nu på storskärmen')),
   setGame: (d) => op('setGame', { game: d.game, team: d.team, r: d.r }),
   pen: (d) => op('setGame', { game: d.game, team: d.team, pen: Number(d.v) }),
+  extraAmt: (d) => { ui.extraAmt[d.team] = Number(d.v); render(); },
+  removeExtra: (d) => op('removeExtra', { team: d.team, id: d.id }).then((ok) => ok && toast('Extrapoängen borttagen')),
   allPart: async (d) => {
     const todo = S.teams.filter((t) => !S.games[d.id]?.[t.id]?.r);
     for (const t of todo) if (!(await op('setGame', { game: d.id, team: t.id, r: 'part' }))) return;
@@ -973,6 +1043,16 @@ document.addEventListener('submit', async (ev) => {
       if (res.id) await savePhoto(res.id, 'new');
       ui.addOpen = false;
       toast(`${data.name} är anmält!`);
+    }
+  } else if (kind === 'extra') {
+    const team = form.dataset.team;
+    const pts = ui.extraAmt[team] ?? 1;
+    if (await op('addExtra', { team, pts, reason: data.reason ?? '' })) {
+      // Formuläret kan redan ha ritats om av live-uppdateringen, så töm fältet som syns nu.
+      const input = document.getElementById(`ex-reason-${team}`);
+      if (input) input.value = '';
+      ui.extraAmt[team] = 1;
+      toast(`${signed(pts)}p till ${S.teams.find((t) => t.id === team)?.name ?? 'laget'}`);
     }
   } else if (kind === 'editTeam') {
     if (await op('updateTeam', { id: form.dataset.id, ...data })) {

@@ -26,6 +26,8 @@ interface QuizEntry { q: number[]; bonus: number }
 // ok och dist räknas ut av servern så att svaret på utslagsfrågan inte behöver skickas till alla.
 interface MusicEntry { a: boolean[]; t: boolean[]; guess: number | null; ok?: boolean; dist?: number | null }
 interface LogEntry { id: string; ts: number; text: string; pts: number | null }
+// Fria plus- eller minuspoäng från domaren, utanför grenarna.
+interface ExtraEntry { id: string; ts: number; pts: number; reason: string }
 
 interface State {
   version: number;
@@ -33,6 +35,7 @@ interface State {
   games: Record<string, Record<string, GameEntry>>;
   quiz: Record<string, QuizEntry>;
   music: Record<string, MusicEntry>;
+  extra: Record<string, ExtraEntry[]>;
   log: LogEntry[];
   current: string;
   announce: string;
@@ -78,7 +81,7 @@ const MIME: Record<string, string> = {
 };
 
 function emptyState(): State {
-  return { version: 0, teams: [], games: {}, quiz: {}, music: {}, log: [], current: LEK_IDS[0], announce: '', disabled: [] };
+  return { version: 0, teams: [], games: {}, quiz: {}, music: {}, extra: {}, log: [], current: LEK_IDS[0], announce: '', disabled: [] };
 }
 
 let state: State = emptyState();
@@ -196,6 +199,7 @@ function apply(op: Op): string | void {
       for (const g of Object.values(state.games)) delete g[team.id];
       delete state.quiz[team.id];
       delete state.music[team.id];
+      delete state.extra[team.id];
       removePhoto(team.id);
       log(`Lag borttaget: ${team.name}`);
       break;
@@ -254,6 +258,24 @@ function apply(op: Op): string | void {
       if (game !== QUIZ.id && game !== MUSIC.id) throw new HttpError(400, 'Okänd gren');
       const pts = typeof op.pts === 'number' && Number.isFinite(op.pts) ? op.pts : null;
       log(`${team.name} · ${gameName(game)}: rättat`, pts);
+      break;
+    }
+    case 'addExtra': {
+      const team = teamOf(op.team);
+      const pts = intIn(op.pts, -50, 50, 'extrapoäng');
+      if (pts === 0) throw new HttpError(400, 'Extrapoängen kan inte vara noll');
+      const reason = str(op.reason, 80);
+      (state.extra[team.id] ??= []).push({ id: randomUUID(), ts: Date.now(), pts, reason });
+      log(`${team.name} · Extrapoäng${reason ? `: ${reason}` : ''}`, pts);
+      break;
+    }
+    case 'removeExtra': {
+      const team = teamOf(op.team);
+      const list = state.extra[team.id] ?? [];
+      const entry = list.find((e) => e.id === op.id);
+      if (!entry) throw new HttpError(404, 'Extrapoängen finns inte');
+      state.extra[team.id] = list.filter((e) => e !== entry);
+      log(`${team.name} · Extrapoäng borttagen${entry.reason ? `: ${entry.reason}` : ''}`, -entry.pts);
       break;
     }
     case 'setGrenOn': {
