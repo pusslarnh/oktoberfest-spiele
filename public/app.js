@@ -872,7 +872,7 @@ function viewGrenar() {
     <div class="max-grid">
       <div class="card"><label>Lekar</label><b>${maxLekar() / WIN_POINTS} × ${WIN_POINTS}p</b><span>Max ${maxLekar()}p · ${PART_POINTS}p för deltagande</span></div>
       <div class="card"><label>Meningsquiz</label><b>${isOn(QUIZ.id) ? `${QUIZ.max}p` : 'Avstängd'}</b><span>18 meningar + 2p bonus</span></div>
-      <div class="card"><label>Musikquiz</label><b>${isOn(MUSIC.id) ? `${MUSIC.max}p` : 'Avstängd'}</b><span>12 låtar × 2p + utslagsfråga</span></div>
+      <div class="card"><label>Musikquiz</label><b>${isOn(MUSIC.id) ? `${MUSIC.max}p` : 'Avstängd'}</b><span>${MUSIC.songCount} låtar × 2p + utslagsfråga</span></div>
       <div class="card gold-card"><label>Totalt max</label><b>${maxTotal()}p</b><span>Prisutdelning efter musikquizet</span></div>
     </div>
     <div class="gren-grid">${cards}</div>

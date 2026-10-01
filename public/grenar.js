@@ -106,12 +106,12 @@ export const QUIZ = {
 };
 
 export const MUSIC = {
-  id: 'musik', icon: '🎵', sv: 'Musikquiz', de: 'Tolv Lieder',
-  desc: 'Varje låt spelas i trettio sekunder. Skriv artist och låttitel, ett poäng för vardera. Alla tolv har en tysk koppling, även de som sjungs på engelska. Byt blankett med ett annat lag vid rättningen. Stavfel ger poäng ändå.',
+  id: 'musik', icon: '🎵', sv: 'Musikquiz', de: 'Neunzehn Lieder',
+  desc: 'Varje låt spelas i trettio sekunder. Skriv artist och låttitel, ett poäng för vardera. Hälften är tyska hits, resten tyska versioner av utländska låtar, och där är det originalet som gäller: skriv originalartisten och originaltiteln. Byt blankett med ett annat lag vid rättningen. Stavfel ger poäng ändå.',
   kit: 'Blatt 4, högtalare och facit (blatt 5)',
-  max: 25,
-  songCount: 12,
-  tiebreak: { q: 'Hur många av de tolv låtarna sjungs på tyska?' },
+  max: 39,
+  songCount: 19,
+  tiebreak: { q: 'Hur många av de nitton låtarna är tyska versioner av utländska original?' },
 };
 
 export const ALL_GRENAR = [...LEKAR, QUIZ, MUSIC];

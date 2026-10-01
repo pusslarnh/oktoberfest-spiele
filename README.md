@@ -6,7 +6,7 @@ En live-poängtavla för Oktoberfest den 3 oktober. Tavlan följer quizpaketets 
 | --- | --- |
 | 12 lekar (Masskrugstemmen, Hammerschlagen, Fingerhakeln, Bierdeckel schnippen, Brezelschnappen, Gummistiefelweitwurf, Kellnerlauf, Reise nach Jerusalem, Zungenbrecher, Trachtenschau, Verbotenes Wort, Ein Prosit) | **3p** för vinst, **1p** för deltagande. Minuspoäng för böjd spik (Hammerschlagen), missad skål (Ein Prosit) och sagt öl (Verbotenes Wort), −1p per gång |
 | Meningsquiz (blatt 2) | 18 meningar × 1p, där halv poäng går bra, plus bonus 2p. Max **20p** |
-| Musikquiz (blatt 4) | 12 låtar × (artist 1p + låt 1p) plus utslagsfråga 1p. Max **25p** |
+| Musikquiz (blatt 4) | 19 låtar × (artist 1p + låt 1p) plus utslagsfråga 1p. Max **39p**. Vid tyska coverversioner är det originalet som ger poäng |
 
 Vid lika totalpoäng avgör utslagsfrågan: den som är närmast 4 utan att gå över vinner. Svaret 5 godkänns också.
 
